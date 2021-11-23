@@ -44,6 +44,10 @@ DuraCalcStrom <- readRDS("Dura_calv_stromal_2.rds")
 StromFibMyo <- readRDS("StromFibroMyo_clustered_TissueRenamed.rds")
 mouseSSfibro <- readRDS("Mouse_SS_Fibro.RDS")
 
+mouseSSfibro$orig.ident <- "Turley"
+StromFibMyo$orig.ident <- "Tabula Muris"
+DuraCalcStrom$orig.ident <- "Meninges"
+
 fibro.big <- readRDS("fibroMerged.rds")
 
 #rename project.name
@@ -63,21 +67,31 @@ StromFibMyo <- UpdateSeuratObject(object = StromFibMyo)
 #saveRDS(StromFibMyo, "StromFibroMyo_clustered_TissueRenamed.rds")
 
 
+rm(DuraCalcStrom)
+rm(mouseSSfibro)
+rm(StromFibMyo)
+rm(Liger3X)
+rm(seurat3x)
+rm(seurat3xScaled)
 
-#fibro.big <- merge(DuraCalcStrom, y = c(mouseSSfibro, StromFibMyo), add.cell.ids = c("DuraCalcStrom", "Shannon Turley", "TabulaMuris"), project = "MergedFibro")
+
+fibro.big <- merge(DuraCalcStrom, y = c(mouseSSfibro, StromFibMyo), add.cell.ids = c("DuraCalcStrom", "Shannon Turley", "TabulaMuris"), project = "MergedFibro")
 
 
-#fibro.big <- ScaleData(fibro.big)
-#fibro.big <- FindVariableFeatures(fibro.big)
-#fibro.big <-RunPCA(fibro.big, dims = 1:5)
+fibro.big <- ScaleData(fibro.big)
+fibro.big <- FindVariableFeatures(fibro.big)
+fibro.big <-RunPCA(fibro.big, dims = 1:5)
 
-#fibro.big <-RunUMAP(fibro.big, dims = 1:5)
-#fibro.big <-RunTSNE(fibro.big, check_duplicates = FALSE)
+fibro.big <-RunUMAP(fibro.big, dims = 1:5)
+fibro.big <-RunTSNE(fibro.big, check_duplicates = FALSE)
 
-#saveRDS(fibro.big, "fibroMerged.rds")
+#saveRDS(fibro.big, "fibroMerged.rds") 
 
 fibro.big <- readRDS("fibroMerged.rds")
-Liger3xtake2 <- seuratToLiger(fibro.big, combined.seurat = TRUE, names = "use-meta", meta.var = "MergedFibro")
+
+fibro.big@raw.data
+DuraCalcStrom@raw.data
+Liger3xtake2 <- seuratToLiger(fibro.big, combined.seurat = TRUE, assays.use = "RNA", meta.var = "orig.ident")
 
 
 
@@ -135,12 +149,12 @@ row.names(mergedFibro_df)=gsub("1_1$","",row.names(mergedFibro_df))
 row.names(mergedFibro_df)=gsub("_1_1$","",row.names(mergedFibro_df))
 head(mergedFibro_df)
 
-attributes(Liger3xtake2)$meta.data <- mergedFibro_df
+attributes(Liger3xtake2)@cell.data$meta.data <- mergedFibro_df
 
-Liger3X <-  readRDS("3xLIGER_preNormalizeRenamed.rds")
-Liger3X <- normalize(Liger3X)
-Liger3X <- selectGenes(Liger3X)
-Liger3X <- scaleNotCenter(Liger3X)
+# Liger3X <-  readRDS("3xLIGER_preNormalizeRenamed.rds")
+Liger3xtake2 <- normalize(Liger3xtake2)
+Liger3xtake2 <- selectGenes(Liger3xtake2)
+Liger3xtake2 <- scaleNotCenter(Liger3xtake2)
 
 ### Stage II: Joint Matrix Factorization
 #any k value between 20-40 is appropriate. Higher k should be used w/ datasets w/ more substructure
@@ -149,11 +163,12 @@ Liger3X <- scaleNotCenter(Liger3X)
 
 #k.suggest <- suggestK(Liger3X, num.cores = 5, nrep = 5)
 
-Liger3X <- optimizeALS(Liger3X, k = 20)
 
-saveRDS(Liger3X, "3xLIGER_postOptimizeALS.rds")
+Liger3xtake2 <- optimizeALS(Liger3xtake2, k = 20)
 
-Liger3X <- readRDS("3xLIGER_postOptimizeALS.rds")
+# saveRDS(Liger3xtake2, "Liger3xtake2_postOptimizeALS.rds")
+# 
+# Liger3X <- readRDS("3xLIGER_postOptimizeALS.rds")
 
 ### Stage III: Quantile Normalization and Joint Clustering
 #The `quantile_norm` procedure produces joint clustering assignments and a low-dimensional representation
@@ -164,21 +179,71 @@ Liger3X <- readRDS("3xLIGER_postOptimizeALS.rds")
 
 ### Stage III: Quantile Normalization and Joint Clustering
 
-Liger3X <- quantile_norm(Liger3X)
+Liger3xtake2 <- quantile_norm(Liger3xtake2)
 
-Liger3X <- louvainCluster(Liger3X, resolution = 1.2)
+Liger3xtake2 <- louvainCluster(Liger3xtake2, resolution = 1)
 
 ### Stage IV: Visualization and Downstream Analysis
 
-Liger3X <- runUMAP(Liger3X)
+Liger3xtake2 <- runUMAP(Liger3X)
 
-saveRDS(Liger3X, "3xLIGER_postUMAP.rds")
+Liger3X <- readRDS("3xLIGER_postUMAP.rds")
 
-seurat3x <- ligerToseurat3x(Liger3X, by.dataset = TRUE)
+seurat3x <- ligerToSeurat(Liger3X)
+
+seurat3x <- ScaleData(seurat3x)
+
+
+seurat3x <- FindNeighbors(seurat3x, reduction = "inmf", dims = 1:ncol(Embeddings(seurat3x, "inmf"))) %>%
+  FindClusters(resolution = 3)
+seurat3x <- RunUMAP(seurat3x, reduction = "inmf", dims = 1:ncol(seurat3x[["inmf"]]))
+
+saveRDS(seurat3x, "seurat3x.rds")
+
+
+
+
+
+
+
+
+saveRDS(Liger3xtake2, "3xLIGER_postUMAP.rds")
+
+Liger3X <- readRDS("3xLIGER_postUMAP.rds")
+
+
 
 saveRDS(seurat3x, "seurat3x.rds")
 
 seurat3x <-readRDS("seurat3xScaled.rds")
+
+Liger3X$umap <- seurat3x@reductions$umap
+seurat3x@meta.data
+seurat3x$Tissue <- fibro.big$Tissue
+
+seurat3x$Tissue <-md.tissue
+rm(md.tissue)
+
+Liger3X <-readRDS("3xLIGER_postUMAP.rds")
+
+
+
+seurat3x@meta.data <- fibro.big@meta.data
+seurat3x$orig.ident <- fibro.big$orig.ident
+
+
+
+seurat3x_df=as.data.frame(seurat3x_df@meta.data)
+row.names(seurat3x_df)=gsub("1_1$","",row.names(seurat3x_df))
+row.names(seurat3x_df)=gsub("_1_1$","",row.names(seurat3x_df))
+head(mergedFibro_df)
+
+write.table(seurat3x$orig.ident, "seurat3x2_orig.ident.txt")
+
+Liger3xtake2$Tissue <- fibro.big$Tissue
+
+
+
 
 
 #`plotByDatasetAndCluster` returns two graphs, generated by t-SNE or UMAP in the previous step.
@@ -226,8 +291,9 @@ head(markers)
 #We can then visualize the expression profiles of individual genes, such as the differentially expressed genes that we just identified.
 #This allows us to visually confirm the cluster- or dataset-specific expression patterns of marker genes.
 #`plotGene` returns graphs of gene loading on the dimensionally reduced graph for each dataset.
-PRF1 <- plotGene(Liger3X, "Col1a1", axis.labels = c('UMAP 1', 'UMAP 2'), return.plots = T)
-PRF1[[1]] + PRF1[[2]]
+PRF1 <- plotGene(Liger3X, "Col1a1", axis.labels = c('tSNE 1', 'tSNE 2'), return.plots = T)
+PRF1[[1]]
+PRF1[[2]]
 
 
 #We can also use `plotGene` to compare the loading of cluster markers within and between datasets.
