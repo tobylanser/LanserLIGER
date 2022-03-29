@@ -37,6 +37,10 @@ library(sctransform)
 library(scCustomize)
 library(CellChat)
 
+DimPlot(all_ages.cells, split.by = "Age", label = T)
+
+Idents(all_ages.cells) <- "cell_type"
+FeaturePlot_scCustom(all_ages.cells, features = "Tslp", split.by = "Age", label = T)
 
 setwd("C:/Users/Stevens Lab/Desktop/LanserLIGER/data")
 
@@ -48,7 +52,7 @@ Sys.setenv('R_MAX_VSIZE'=memory.size(max=TRUE))
 # devtools::install_github("jokergoo/ComplexHeatmap")
 # devtools::install_github("sqjin/CellChat")
 # install.packages("magrittr")
-# p5 <- readRDS("timecourse_all_P5_labeled.rds")
+p5 <- readRDS("timecourse_all_P5_labeled.rds")
 # 
 # 
 # adult <- readRDS("timecourse_all_Adult_Aged_labeled.rds")
@@ -73,6 +77,21 @@ Sys.setenv('R_MAX_VSIZE'=memory.size(max=TRUE))
 
 adult <- readRDS("timecourse_adult_labeled.rds")
 
+all_ages.cells <- readRDS("timecourse_allAges_allCells.rds")
+
+DimPlot_scCustom(all_ages.cells, label = T, group.by = "cell_type")
+ggsave("allCells_dimplot_celltype.jpeg", device = "jpeg", 
+       width = 16, height = 9, units = "in", dpi = 600)
+
+DimPlot_scCustom(all_ages.cells, label = T, group.by = "cell_type")
+ggsave("allCells_cellTypes_dimplot_celltype.jpeg", device = "jpeg", 
+       width = 16, height = 9, units = "in", dpi = 600)
+
+
+
+DimPlot_scCustom(adult, label = T, group.by = "cell_type")
+ggsave("Adult_dimplot_celltype.jpeg", device = "jpeg", 
+       width = 16, height = 9, units = "in", dpi = 600)
 
 ## CellChat for Adult
 adult.cellchat <- createCellChat(object = adult, group.by = "cell_type")
